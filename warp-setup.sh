@@ -1,5 +1,5 @@
 #!/bin/bash
-# G-Everywhere v2.0
+# G-Everywhere v2.1
 # Google Unlock via Cloudflare WARP
 # https://github.com/ctsunny/g-everywhere
 
@@ -12,45 +12,43 @@ MAGENTA='\033[0;35m'
 NC='\033[0m'
 BOLD='\033[1m'
 
+# ============================================================
+# 正确的 WARP Endpoint IP 范围: 162.159.193.x:2408
+# ============================================================
 declare -A REGION_ENDPOINTS=(
-    ["自动"]="engage.cloudflareclient.com:2408"
-    ["🇺🇸 美国-洛杉矶"]="162.159.192.1:2408"
-    ["🇺🇸 美国-纽约"]="162.159.193.1:2408"
-    ["🇯🇵 日本-东京"]="162.159.195.1:2408"
-    ["🇸🇬 新加坡"]="162.159.196.1:2408"
-    ["🇩🇪 德国-法兰克福"]="162.159.197.1:2408"
-    ["🇬🇧 英国-伦敦"]="162.159.198.1:2408"
-    ["🇳🇱 荷兰-阿姆斯特丹"]="162.159.199.1:2408"
-    ["🇦🇺 澳大利亚-悉尼"]="162.159.200.1:2408"
-    ["🇮🇳 印度-孟买"]="162.159.204.1:2408"
-    ["🇧🇷 巴西-圣保罗"]="162.159.205.1:2408"
-    ["🇨🇦 加拿大-多伦多"]="162.159.209.1:2408"
-    ["🇰🇷 韩国-首尔"]="162.159.210.1:2408"
-    ["🇭🇰 香港"]="162.159.211.1:2408"
+    ["🌐 自动"]="engage.cloudflareclient.com:2408"
+    ["🇺🇸 美国"]="162.159.193.1:2408"
+    ["🇯🇵 日本"]="162.159.193.2:2408"
+    ["🇸🇬 新加坡"]="162.159.193.3:2408"
+    ["🇩🇪 德国"]="162.159.193.4:2408"
+    ["🇬🇧 英国"]="162.159.193.5:2408"
+    ["🇳🇱 荷兰"]="162.159.193.6:2408"
+    ["🇦🇺 澳大利亚"]="162.159.193.7:2408"
+    ["🇰🇷 韩国"]="162.159.193.8:2408"
+    ["🇭🇰 香港"]="162.159.193.9:2408"
+    ["🇨🇦 加拿大"]="162.159.193.10:2408"
+    ["🇮🇳 印度"]="162.159.193.11:2408"
+    ["🇧🇷 巴西"]="162.159.193.12:2408"
 )
 
 REGION_KEYS=(
-    "自动"
-    "🇺🇸 美国-洛杉矶"
-    "🇺🇸 美国-纽约"
-    "🇯🇵 日本-东京"
+    "🌐 自动"
+    "🇺🇸 美国"
+    "🇯🇵 日本"
     "🇸🇬 新加坡"
-    "🇩🇪 德国-法兰克福"
-    "🇬🇧 英国-伦敦"
-    "🇳🇱 荷兰-阿姆斯特丹"
-    "🇦🇺 澳大利亚-悉尼"
-    "🇮🇳 印度-孟买"
-    "🇧🇷 巴西-圣保罗"
-    "🇨🇦 加拿大-多伦多"
-    "🇰🇷 韩国-首尔"
+    "🇩🇪 德国"
+    "🇬🇧 英国"
+    "🇳🇱 荷兰"
+    "🇦🇺 澳大利亚"
+    "🇰🇷 韩国"
     "🇭🇰 香港"
+    "🇨🇦 加拿大"
+    "🇮🇳 印度"
+    "🇧🇷 巴西"
 )
 
-SELECTED_REGION="自动"
+SELECTED_REGION="🌐 自动"
 
-# ============================================================
-# Banner - 原创设计
-# ============================================================
 show_banner() {
     clear
     echo -e "${BOLD}${BLUE}"
@@ -64,7 +62,7 @@ show_banner() {
     echo -e "  ${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo -e "  ${GREEN}  Google Unlock  ${NC}│${YELLOW}  Cloudflare WARP  ${NC}│${MAGENTA}  Auto Routing  ${NC}"
     echo -e "  ${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "  ${BLUE}github.com/ctsunny/g-everywhere${NC}  │  ${GREEN}v2.0${NC}\n"
+    echo -e "  ${BLUE}github.com/ctsunny/g-everywhere${NC}  │  ${GREEN}v2.1${NC}\n"
 }
 
 check_root() {
@@ -119,7 +117,67 @@ select_region() {
         echo -e "  ${GREEN}✓ 已选择: $SELECTED_REGION${NC}"
     else
         echo -e "  ${YELLOW}无效，使用自动${NC}"
-        SELECTED_REGION="自动"
+        SELECTED_REGION="🌐 自动"
+    fi
+}
+
+# ============================================================
+# 测试 Endpoint 连通性 (UDP)
+# ============================================================
+test_endpoint() {
+    local EP_IP=$(echo $1 | cut -d: -f1)
+    local EP_PORT=$(echo $1 | cut -d: -f2)
+    # 跳过域名类型的 endpoint 检测
+    if [[ "$EP_IP" =~ ^[a-zA-Z] ]]; then
+        return 0
+    fi
+    if command -v nc &>/dev/null; then
+        nc -zu -w 3 "$EP_IP" "$EP_PORT" 2>/dev/null
+        return $?
+    fi
+    # 备用：用 timeout + bash /dev/udp
+    timeout 3 bash -c "echo > /dev/udp/$EP_IP/$EP_PORT" 2>/dev/null
+    return $?
+}
+
+# ============================================================
+# 应用 Endpoint 并验证实际出口
+# ============================================================
+apply_endpoint() {
+    local ENDPOINT="${REGION_ENDPOINTS[$SELECTED_REGION]}"
+
+    if [ "$SELECTED_REGION" = "🌐 自动" ]; then
+        echo -e "  节点: 自动分配"
+        warp-cli --accept-tos clear-custom-endpoint 2>/dev/null || true
+    else
+        echo -e "  测试节点连通性: ${YELLOW}$ENDPOINT${NC} ..."
+        if test_endpoint "$ENDPOINT"; then
+            echo -e "  ${GREEN}✓ 节点可达${NC}"
+            warp-cli --accept-tos set-custom-endpoint "$ENDPOINT" 2>/dev/null || \
+            warp-cli set-custom-endpoint "$ENDPOINT" 2>/dev/null || true
+        else
+            echo -e "  ${YELLOW}⚠ 节点不可达，回退到自动分配${NC}"
+            warp-cli --accept-tos clear-custom-endpoint 2>/dev/null || true
+            SELECTED_REGION="🌐 自动"
+        fi
+    fi
+
+    # 重连
+    warp-cli --accept-tos disconnect 2>/dev/null; sleep 1
+    warp-cli --accept-tos connect 2>/dev/null
+    echo -e "  连接中，等待 5 秒..."
+    sleep 5
+
+    # 验证实际出口 IP
+    echo -e "  验证实际出口..."
+    ACTUAL_IP=$(curl -x socks5://127.0.0.1:40000 -s --max-time 10 ip.sb 2>/dev/null)
+    if [ -n "$ACTUAL_IP" ]; then
+        ACTUAL_INFO=$(curl -s --max-time 5 "http://ip-api.com/json/$ACTUAL_IP?lang=zh-CN" 2>/dev/null)
+        ACTUAL_COUNTRY=$(echo $ACTUAL_INFO | grep -oP '"country":"\K[^"]+' || echo "未知")
+        ACTUAL_CITY=$(echo $ACTUAL_INFO | grep -oP '"city":"\K[^"]+' || echo "未知")
+        echo -e "  ${GREEN}✓ 实际出口: $ACTUAL_COUNTRY $ACTUAL_CITY (${ACTUAL_IP})${NC}"
+    else
+        echo -e "  ${RED}✗ WARP 连接失败，请尝试其他地区或使用自动${NC}"
     fi
 }
 
@@ -131,7 +189,7 @@ install_warp() {
     case $OS in
         ubuntu|debian)
             apt-get update -y >/dev/null 2>&1
-            apt-get install -y gnupg curl wget >/dev/null 2>&1
+            apt-get install -y gnupg curl wget netcat-openbsd >/dev/null 2>&1
             curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg | \
                 gpg --yes --dearmor --output /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg
             echo "deb [arch=$ARCH signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg] \
@@ -149,7 +207,9 @@ enabled=1
 gpgcheck=1
 gpgkey=https://pkg.cloudflareclient.com/pubkey.gpg
 EOF
-            command -v dnf &>/dev/null && dnf install -y cloudflare-warp || yum install -y cloudflare-warp
+            command -v dnf &>/dev/null && \
+                dnf install -y cloudflare-warp nmap-ncat || \
+                yum install -y cloudflare-warp nmap-ncat
             ;;
         *)
             echo -e "${RED}不支持的系统: $OS${NC}"; exit 1 ;;
@@ -165,29 +225,25 @@ configure_warp() {
     echo -e "\n${CYAN}  [2/4] 配置 WARP...${NC}"
     systemctl start warp-svc 2>/dev/null || true
     sleep 2
+
+    # 注册（兼容新旧版本）
     warp-cli --accept-tos registration new 2>/dev/null || \
     warp-cli --accept-tos register 2>/dev/null || true
     sleep 1
+
+    # 代理模式
     warp-cli --accept-tos mode proxy 2>/dev/null || \
     warp-cli --accept-tos set-mode proxy 2>/dev/null || true
+
+    # 代理端口
     warp-cli --accept-tos proxy port 40000 2>/dev/null || \
     warp-cli --accept-tos set-proxy-port 40000 2>/dev/null || true
 
-    ENDPOINT="${REGION_ENDPOINTS[$SELECTED_REGION]}"
-    if [ "$SELECTED_REGION" != "自动" ]; then
-        echo -e "  节点: ${YELLOW}$SELECTED_REGION${NC} ($ENDPOINT)"
-        warp-cli --accept-tos set-custom-endpoint "$ENDPOINT" 2>/dev/null || \
-        warp-cli set-custom-endpoint "$ENDPOINT" 2>/dev/null || true
-    else
-        warp-cli --accept-tos clear-custom-endpoint 2>/dev/null || true
-        echo -e "  节点: 自动分配"
-    fi
+    # 应用地区 endpoint + 验证
+    apply_endpoint
 
-    echo -e "  连接中..."
-    warp-cli --accept-tos connect 2>/dev/null || warp-cli connect 2>/dev/null
-    sleep 3
     STATUS=$(warp-cli --accept-tos status 2>/dev/null || warp-cli status 2>/dev/null)
-    echo -e "  状态: ${GREEN}$STATUS${NC}"
+    echo -e "  WARP 状态: ${GREEN}$STATUS${NC}"
     echo -e "  ${GREEN}✓ WARP 配置完成${NC}"
 }
 
@@ -280,26 +336,39 @@ stop() {
 }
 
 status() {
-    echo "── WARP ──"
+    echo "── WARP 客户端 ──"
     warp-cli status 2>/dev/null || echo "未运行"
     echo ""
     echo "── 代理进程 ──"
-    pgrep -x redsocks >/dev/null && echo "redsocks 运行中 (PID: $(pgrep -x redsocks))" || echo "redsocks 未运行"
+    pgrep -x redsocks >/dev/null && \
+        echo "redsocks 运行中 (PID: $(pgrep -x redsocks))" || \
+        echo "redsocks 未运行"
     echo ""
     echo "── iptables 规则 ──"
-    COUNT=$(iptables -t nat -L WARP_GOOGLE -n 2>/dev/null | grep -c REDIRECT || echo 0)
+    COUNT=$(iptables -t nat -L WARP_GOOGLE -n 2>/dev/null | grep -c REDIRECT 2>/dev/null || echo 0)
     echo "Google 路由规则: $COUNT 条"
     echo ""
-    echo "── Endpoint ──"
+    echo "── 当前 Endpoint ──"
     warp-cli settings 2>/dev/null | grep -i endpoint || echo "默认（自动）"
+    echo ""
+    echo "── 实际出口 IP ──"
+    WARP_IP=$(curl -x socks5://127.0.0.1:40000 -s --max-time 8 ip.sb 2>/dev/null)
+    if [ -n "$WARP_IP" ]; then
+        WARP_INFO=$(curl -s --max-time 5 "http://ip-api.com/json/$WARP_IP?lang=zh-CN" 2>/dev/null)
+        C=$(echo $WARP_INFO | grep -oP '"country":"\K[^"]+' || echo "未知")
+        T=$(echo $WARP_INFO | grep -oP '"city":"\K[^"]+' || echo "未知")
+        echo "$WARP_IP  ($C $T)"
+    else
+        echo "获取失败（WARP 未连接）"
+    fi
 }
 
 case "$1" in
-    start) start ;;
-    stop) stop ;;
+    start)   start ;;
+    stop)    stop ;;
     restart) stop; sleep 1; start ;;
-    status) status ;;
-    *) echo "用法: $0 {start|stop|restart|status}" ;;
+    status)  status ;;
+    *)       echo "用法: $0 {start|stop|restart|status}" ;;
 esac
 SCRIPT
     chmod +x /usr/local/bin/g-proxy
@@ -325,60 +394,67 @@ EOF
 }
 
 # ============================================================
-# 安装后提示
+# 安装后提示（命令改为 g-e）
 # ============================================================
 show_post_install() {
     WARP_IP=$(curl -x socks5://127.0.0.1:40000 -s --max-time 10 ip.sb 2>/dev/null)
-    WARP_INFO=$(curl -s --max-time 5 "http://ip-api.com/json/$WARP_IP?lang=zh-CN" 2>/dev/null)
-    WARP_COUNTRY=$(echo $WARP_INFO | grep -oP '"country":"\K[^"]+' || echo "未知")
-    WARP_CITY=$(echo $WARP_INFO | grep -oP '"city":"\K[^"]+' || echo "未知")
+    WARP_COUNTRY="未知"; WARP_CITY="未知"
+    if [ -n "$WARP_IP" ]; then
+        WARP_INFO=$(curl -s --max-time 5 "http://ip-api.com/json/$WARP_IP?lang=zh-CN" 2>/dev/null)
+        WARP_COUNTRY=$(echo $WARP_INFO | grep -oP '"country":"\K[^"]+' || echo "未知")
+        WARP_CITY=$(echo $WARP_INFO | grep -oP '"city":"\K[^"]+' || echo "未知")
+    fi
 
     echo -e "\n${BOLD}${GREEN}"
-    echo "  ┌─────────────────────────────────────────┐"
-    echo "  │         ✅  安装成功！Google 已解锁       │"
-    echo "  └─────────────────────────────────────────┘"
+    echo "  ┌──────────────────────────────────────────┐"
+    echo "  │       ✅  安装成功！Google 已解锁          │"
+    echo "  └──────────────────────────────────────────┘"
     echo -e "${NC}"
     echo -e "  ${YELLOW}出口地区 :${NC} ${GREEN}$SELECTED_REGION${NC}"
-    echo -e "  ${YELLOW}WARP IP  :${NC} ${GREEN}$WARP_IP${NC}"
+    echo -e "  ${YELLOW}WARP IP  :${NC} ${GREEN}${WARP_IP:-获取失败}${NC}"
     echo -e "  ${YELLOW}WARP 位置:${NC} ${GREEN}$WARP_COUNTRY $WARP_CITY${NC}"
     echo ""
-    echo -e "  ${CYAN}━━━━━━━━━ 常用命令 ━━━━━━━━━${NC}"
-    echo -e "  ${GREEN}g${NC}              打开管理菜单"
-    echo -e "  ${GREEN}g status${NC}       查看运行状态"
-    echo -e "  ${GREEN}g start${NC}        启动"
-    echo -e "  ${GREEN}g stop${NC}         停止"
-    echo -e "  ${GREEN}g restart${NC}      重启"
-    echo -e "  ${GREEN}g ip${NC}           查看 IP"
-    echo -e "  ${GREEN}g test${NC}         测试 Google"
-    echo -e "  ${GREEN}g region${NC}       切换出口地区"
-    echo -e "  ${GREEN}g uninstall${NC}    卸载"
+    echo -e "  ${CYAN}━━━━━━━━━ 管理命令 ━━━━━━━━━${NC}"
+    echo -e "  ${GREEN}g-e${NC}              打开管理菜单"
+    echo -e "  ${GREEN}g-e status${NC}       查看运行状态"
+    echo -e "  ${GREEN}g-e start${NC}        启动"
+    echo -e "  ${GREEN}g-e stop${NC}         停止"
+    echo -e "  ${GREEN}g-e restart${NC}      重启"
+    echo -e "  ${GREEN}g-e ip${NC}           查看 IP"
+    echo -e "  ${GREEN}g-e test${NC}         测试 Google"
+    echo -e "  ${GREEN}g-e region${NC}       切换出口地区"
+    echo -e "  ${GREEN}g-e uninstall${NC}    卸载"
     echo -e "  ${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
 }
 
 # ============================================================
-# 管理命令 /usr/local/bin/g
+# 管理命令 /usr/local/bin/g-e（避免与系统命令冲突）
 # ============================================================
 create_management() {
-    cat > /usr/local/bin/g << 'EOF'
+    # 清理旧版 g 命令
+    rm -f /usr/local/bin/g
+
+    cat > /usr/local/bin/g-e << 'EOF'
 #!/bin/bash
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[0;33m'
-CYAN='\033[0;36m'; BLUE='\033[0;34m'; BOLD='\033[1m'; NC='\033[0m'
+CYAN='\033[0;36m'; BOLD='\033[1m'; NC='\033[0m'
 
 case "$1" in
     status)
-        echo -e "\n${CYAN}  ── 运行状态 ──${NC}"
+        echo -e "\n${CYAN}  ── 运行状态 ──${NC}\n"
         /usr/local/bin/g-proxy status
         echo "" ;;
     start)
         echo -e "${CYAN}启动中...${NC}"
-        systemctl start warp-svc 2>/dev/null; sleep 1
-        warp-cli connect 2>/dev/null
+        systemctl start warp-svc 2>/dev/null; sleep 2
+        warp-cli --accept-tos connect 2>/dev/null || warp-cli connect 2>/dev/null
+        sleep 2
         /usr/local/bin/g-proxy start
         echo -e "${GREEN}✓ 已启动${NC}" ;;
     stop)
         echo -e "${CYAN}停止中...${NC}"
         /usr/local/bin/g-proxy stop
-        warp-cli disconnect 2>/dev/null
+        warp-cli --accept-tos disconnect 2>/dev/null || warp-cli disconnect 2>/dev/null
         echo -e "${GREEN}✓ 已停止${NC}" ;;
     restart)
         $0 stop; sleep 2; $0 start ;;
@@ -387,19 +463,31 @@ case "$1" in
         CODE=$(curl -s --max-time 10 -o /dev/null -w "%{http_code}" https://www.google.com)
         [ "$CODE" = "200" ] && \
             echo -e "${GREEN}✓ Google 可访问 (HTTP $CODE)${NC}" || \
-            echo -e "${RED}✗ 无法访问 (HTTP $CODE)${NC}" ;;
+            echo -e "${RED}✗ 无法访问 (HTTP $CODE)${NC}"
+        echo ""
+        echo -e "${CYAN}Cloudflare Trace（确认 WARP 状态）:${NC}"
+        curl -x socks5://127.0.0.1:40000 -s --max-time 10 https://cloudflare.com/cdn-cgi/trace | \
+            grep -E "^(ip|loc|colo|warp)=" || echo "获取失败" ;;
     ip)
         echo -e "\n${YELLOW}直连 IP:${NC}"
-        D=$(curl -4 -s --max-time 5 ip.sb); echo -e "${GREEN}$D${NC}"
+        D=$(curl -4 -s --max-time 5 ip.sb 2>/dev/null); echo -e "${GREEN}${D:-获取失败}${NC}"
         echo -e "${YELLOW}WARP IP:${NC}"
-        W=$(curl -x socks5://127.0.0.1:40000 -s --max-time 10 ip.sb)
-        [ -n "$W" ] && echo -e "${GREEN}$W${NC}" || echo -e "${RED}获取失败（WARP 未运行）${NC}"
+        W=$(curl -x socks5://127.0.0.1:40000 -s --max-time 10 ip.sb 2>/dev/null)
+        if [ -n "$W" ]; then
+            INFO=$(curl -s --max-time 5 "http://ip-api.com/json/$W?lang=zh-CN" 2>/dev/null)
+            C=$(echo $INFO | grep -oP '"country":"\K[^"]+' || echo "未知")
+            T=$(echo $INFO | grep -oP '"city":"\K[^"]+' || echo "未知")
+            echo -e "${GREEN}$W  ($C $T)${NC}"
+        else
+            echo -e "${RED}获取失败（WARP 未连接）${NC}"
+        fi
         echo "" ;;
     region)
         if [ -f /usr/local/bin/warp-setup.sh ]; then
             bash /usr/local/bin/warp-setup.sh --change-region
         else
             echo -e "${RED}请重新运行安装脚本切换地区${NC}"
+            echo "bash <(curl -fsSL https://raw.githubusercontent.com/ctsunny/g-everywhere/main/warp-setup.sh) --change-region"
         fi ;;
     uninstall)
         echo -e "${YELLOW}卸载中...${NC}"
@@ -407,7 +495,7 @@ case "$1" in
         warp-cli disconnect 2>/dev/null
         systemctl disable --now g-everywhere warp-svc 2>/dev/null
         rm -f /etc/systemd/system/g-everywhere.service
-        rm -f /usr/local/bin/g-proxy /usr/local/bin/g /usr/local/bin/warp-setup.sh
+        rm -f /usr/local/bin/g-proxy /usr/local/bin/g-e /usr/local/bin/warp-setup.sh
         rm -f /etc/redsocks.conf
         apt-get remove -y cloudflare-warp redsocks 2>/dev/null || \
             dnf remove -y cloudflare-warp redsocks 2>/dev/null || \
@@ -416,23 +504,27 @@ case "$1" in
               /etc/yum.repos.d/cloudflare-warp.repo
         echo -e "${GREEN}✓ 已完全卸载${NC}" ;;
     *)
-        # 无参数时打开交互菜单
-        bash /usr/local/bin/warp-setup.sh 2>/dev/null || {
-            echo -e "${CYAN}G-Everywhere 管理工具${NC}\n"
-            echo "用法: g <命令>"
+        # 无参数：打开主菜单
+        if [ -f /usr/local/bin/warp-setup.sh ]; then
+            bash /usr/local/bin/warp-setup.sh
+        else
+            echo -e "${CYAN}G-Everywhere 管理工具 v2.1${NC}\n"
+            echo "用法: g-e <命令>"
             echo ""
-            echo "  status    查看状态"
+            echo "  status    查看状态（含实际出口 IP）"
             echo "  start     启动"
             echo "  stop      停止"
             echo "  restart   重启"
-            echo "  test      测试 Google"
-            echo "  ip        查看 IP"
-            echo "  region    切换地区"
+            echo "  test      测试 Google + Cloudflare Trace"
+            echo "  ip        查看直连/WARP IP"
+            echo "  region    切换出口地区"
             echo "  uninstall 卸载"
-        } ;;
+        fi ;;
 esac
 EOF
-    chmod +x /usr/local/bin/g
+    chmod +x /usr/local/bin/g-e
+
+    # 保存脚本自身供 g-e 调用
     cp "$0" /usr/local/bin/warp-setup.sh 2>/dev/null || true
     chmod +x /usr/local/bin/warp-setup.sh 2>/dev/null || true
 }
@@ -442,27 +534,21 @@ EOF
 # ============================================================
 change_region() {
     echo -e "\n${CYAN}  ── 切换出口地区 ──${NC}"
-    echo -e "  当前 Endpoint:"
+    echo -e "\n  当前 Endpoint:"
     warp-cli settings 2>/dev/null | grep -i endpoint || echo "  默认（自动）"
+    echo -e "\n  当前出口 IP:"
+    CURRENT_WARP=$(curl -x socks5://127.0.0.1:40000 -s --max-time 8 ip.sb 2>/dev/null)
+    [ -n "$CURRENT_WARP" ] && echo -e "  ${GREEN}$CURRENT_WARP${NC}" || echo -e "  ${RED}未连接${NC}"
+
     select_region
-    ENDPOINT="${REGION_ENDPOINTS[$SELECTED_REGION]}"
-    if [ "$SELECTED_REGION" = "自动" ]; then
-        warp-cli --accept-tos clear-custom-endpoint 2>/dev/null || true
-    else
-        warp-cli --accept-tos set-custom-endpoint "$ENDPOINT" 2>/dev/null || \
-        warp-cli set-custom-endpoint "$ENDPOINT" 2>/dev/null || true
-    fi
-    warp-cli --accept-tos disconnect 2>/dev/null; sleep 1
-    warp-cli --accept-tos connect 2>/dev/null; sleep 3
-    echo -e "\n  ${GREEN}✓ 已切换: $SELECTED_REGION${NC}"
-    WARP_IP=$(curl -x socks5://127.0.0.1:40000 -s --max-time 10 ip.sb 2>/dev/null)
-    [ -n "$WARP_IP" ] && {
-        WARP_INFO=$(curl -s --max-time 5 "http://ip-api.com/json/$WARP_IP?lang=zh-CN" 2>/dev/null)
-        echo -e "  新 WARP IP: ${GREEN}$WARP_IP${NC}"
-        echo -e "  位置: ${GREEN}$(echo $WARP_INFO | grep -oP '"country":"\K[^"]+') $(echo $WARP_INFO | grep -oP '"city":"\K[^"]+')${NC}"
-    }
+    apply_endpoint
+    /usr/local/bin/g-proxy restart 2>/dev/null
+    echo -e "\n  ${GREEN}✓ 地区切换完成${NC}"
 }
 
+# ============================================================
+# 完整安装流程
+# ============================================================
 do_install() {
     select_region
     install_warp
@@ -478,7 +564,7 @@ do_uninstall() {
     warp-cli disconnect 2>/dev/null || true
     systemctl disable --now g-everywhere warp-svc 2>/dev/null || true
     rm -f /etc/systemd/system/g-everywhere.service
-    rm -f /usr/local/bin/g-proxy /usr/local/bin/g /usr/local/bin/warp-setup.sh
+    rm -f /usr/local/bin/g-proxy /usr/local/bin/g-e /usr/local/bin/warp-setup.sh
     rm -f /etc/redsocks.conf
     iptables -t nat -D OUTPUT -j WARP_GOOGLE 2>/dev/null || true
     iptables -t nat -F WARP_GOOGLE 2>/dev/null || true
@@ -497,20 +583,20 @@ do_uninstall() {
 }
 
 do_status() {
-    echo -e "\n${CYAN}  ── 运行状态 ──${NC}"
+    echo -e "\n${CYAN}  ── 运行状态 ──${NC}\n"
     if command -v warp-cli &>/dev/null; then
         /usr/local/bin/g-proxy status 2>/dev/null || {
-            echo -e "  ${YELLOW}WARP 已安装但透明代理未运行${NC}"
+            echo -e "  ${YELLOW}WARP 已安装，透明代理未运行${NC}"
             warp-cli status 2>/dev/null
         }
     else
-        echo -e "  ${RED}WARP 未安装${NC}"
+        echo -e "  ${RED}WARP 未安装，请选择选项 1 进行安装${NC}"
     fi
     echo ""
 }
 
 # ============================================================
-# 菜单循环（修复退出问题）
+# 主菜单（循环，不自动退出）
 # ============================================================
 show_menu() {
     while true; do
@@ -519,7 +605,7 @@ show_menu() {
         echo -e "  ${YELLOW}请选择操作:${NC}\n"
         echo -e "  ${GREEN}1.${NC} 安装 WARP（Google 解锁 + 地区选择）"
         echo -e "  ${GREEN}2.${NC} 切换出口地区"
-        echo -e "  ${GREEN}3.${NC} 查看状态"
+        echo -e "  ${GREEN}3.${NC} 查看运行状态"
         echo -e "  ${GREEN}4.${NC} 卸载 WARP"
         echo -e "  ${GREEN}0.${NC} 退出\n"
         read -p "  请输入选项 [0-4]: " choice
@@ -528,21 +614,23 @@ show_menu() {
             1) do_install ;;
             2)
                 if ! command -v warp-cli &>/dev/null; then
-                    echo -e "  ${RED}请先安装 WARP（选项1）${NC}"
+                    echo -e "  ${RED}请先安装 WARP（选项 1）${NC}"
                 else
                     change_region
                 fi ;;
             3) do_status ;;
             4) do_uninstall ;;
             0) echo -e "  ${GREEN}Bye!${NC}\n"; exit 0 ;;
-            *) echo -e "  ${RED}无效选项${NC}" ;;
+            *) echo -e "  ${RED}无效选项，请重新输入${NC}" ;;
         esac
         echo ""
         read -p "  按 Enter 返回菜单..." _
     done
 }
 
+# ============================================================
 # 主入口
+# ============================================================
 main() {
     check_root
     detect_os
