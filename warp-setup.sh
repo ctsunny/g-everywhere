@@ -1,6 +1,6 @@
 #!/bin/bash
 # G-Everywhere v3.3
-# 修复：自动探测可用 UDP 端口，解决握手超时问题
+# 修复：探测可用 UDP 端口，解决握手超时问题
 # https://github.com/ctsunny/g-everywhere
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[0;33m'
