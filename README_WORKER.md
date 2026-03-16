@@ -1,6 +1,10 @@
-# G-Everywhere Worker Edition
+# G-Everywhere Worker Edition v5.2
 
 基于 wk= 命令快速切换地区的 Google 解锁方案。专为需要频繁切换地区的用户设计。
+
+> 🚀 最后更新：2026-03-16 | 版本：v5.2
+> 
+> 🔄 重构优化：wk=命令快速切换 | 智能地区获取 | 简化管理
 
 ## 🚀 快速开始
 

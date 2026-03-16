@@ -1,7 +1,8 @@
 #!/bin/bash
-# G-Everywhere Worker Final v5.2
+# G-Everywhere Worker Final v5.2.1
 # 完整集成版 - wk=快速切换 + 智能地区获取
 # 一键安装，极简管理
+# 更新: 2026-03-16 - 优化安装流程和错误处理
 
 set -e
 
