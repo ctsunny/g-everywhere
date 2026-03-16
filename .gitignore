@@ -1,0 +1,7 @@
+# 忽略临时文件 
+*.bat 
+*.log 
+temp/ 
+backups/ 
+.vscode/ 
+*.tmp 
