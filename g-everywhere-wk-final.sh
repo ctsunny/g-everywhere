@@ -64,6 +64,16 @@ declare -A ENDPOINT_MAP=(
     ["br"]="162.159.193.12"
 )
 
+# 地区代码到 ISO-3166-1 alpha-2 的映射（用于匹配 ip-api.com 返回值）
+declare -A REGION_CC=(
+    ["auto"]=""   ["us"]="US"  ["jp"]="JP"  ["sg"]="SG"
+    ["de"]="DE"   ["uk"]="GB"  ["nl"]="NL"  ["au"]="AU"
+    ["kr"]="KR"   ["hk"]="HK"  ["ca"]="CA"  ["in"]="IN"  ["br"]="BR"
+)
+
+# 有序地区列表（用于菜单，保证显示顺序一致）
+WK_REGION_CODES=("auto" "us" "jp" "sg" "de" "uk" "nl" "au" "kr" "hk" "ca" "in" "br")
+
 # ============================================
 # 显示横幅
 # ============================================
@@ -258,19 +268,19 @@ alias ge-wk='/usr/local/bin/ge-wk'
 alias wk='ge-wk'
 
 # wk=快速切换别名
-alias wk=us='ge-wk wk=us'
-alias wk=sg='ge-wk wk=sg'
-alias wk=jp='ge-wk wk=jp'
-alias wk=de='ge-wk wk=de'
-alias wk=uk='ge-wk wk=uk'
-alias wk=nl='ge-wk wk=nl'
-alias wk=au='ge-wk wk=au'
-alias wk=kr='ge-wk wk=kr'
-alias wk=hk='ge-wk wk=hk'
-alias wk=ca='ge-wk wk=ca'
-alias wk=in='ge-wk wk=in'
-alias wk=br='ge-wk wk=br'
-alias wk=auto='ge-wk wk=auto'
+alias 'wk=us'='ge-wk wk=us'
+alias 'wk=sg'='ge-wk wk=sg'
+alias 'wk=jp'='ge-wk wk=jp'
+alias 'wk=de'='ge-wk wk=de'
+alias 'wk=uk'='ge-wk wk=uk'
+alias 'wk=nl'='ge-wk wk=nl'
+alias 'wk=au'='ge-wk wk=au'
+alias 'wk=kr'='ge-wk wk=kr'
+alias 'wk=hk'='ge-wk wk=hk'
+alias 'wk=ca'='ge-wk wk=ca'
+alias 'wk=in'='ge-wk wk=in'
+alias 'wk=br'='ge-wk wk=br'
+alias 'wk=auto'='ge-wk wk=auto'
 
 # 快捷命令别名
 alias wk-us='ge-wk wk=us'
@@ -374,7 +384,8 @@ wk_smart_region_engine() {
         fi
         
         # 检查是否匹配目标
-        if [ "$country_code" = "$target" ]; then
+        local target_cc="${REGION_CC[$target]}"
+        if [ -n "$target_cc" ] && [ "$country_code" = "$target_cc" ]; then
             best_ip="$exit_ip"
             best_country="$country"
             best_attempt=$attempt
@@ -496,6 +507,7 @@ After=network.target
 
 [Service]
 Type=simple
+ExecStartPre=/bin/sh -c 'iptables-restore < /etc/iptables-warp.rules || echo "iptables-restore: failed to restore rules, traffic may not be redirected"'
 ExecStart=/usr/sbin/redsocks -c $REDSOCKS_CONF
 Restart=on-failure
 RestartSec=5
@@ -537,7 +549,25 @@ _setup_iptables_rules() {
     iptables -t nat -A OUTPUT -j WARP_GOOGLE
     iptables -t nat -A PREROUTING -j WARP_GOOGLE
     
+    # 持久化 iptables 规则，重启后自动恢复
+    if iptables-save > /etc/iptables-warp.rules 2>/dev/null; then
+        echo -e "  ${GREEN}✓ iptables规则已持久化${NC}"
+    else
+        echo -e "  ${YELLOW}⚠ iptables规则持久化失败，重启后需重新配置${NC}"
+    fi
+    
     echo -e "  ${GREEN}✓ iptables规则已配置${NC}"
+}
+
+_restore_iptables_rules() {
+    if [ -f /etc/iptables-warp.rules ]; then
+        if ! iptables-restore < /etc/iptables-warp.rules 2>/dev/null; then
+            echo -e "  ${YELLOW}⚠ 恢复已保存规则失败，重新生成...${NC}"
+            _setup_iptables_rules
+        fi
+    else
+        _setup_iptables_rules
+    fi
 }
 
 # ============================================
@@ -621,17 +651,16 @@ main_install() {
     echo -e "${YELLOW}提示: 安装后可使用 wk=命令快速切换${NC}\n"
     
     local i=1
-    for code in "${!WK_REGIONS[@]}"; do
+    for code in "${WK_REGION_CODES[@]}"; do
         printf "  ${GREEN}%2d.${NC} %s\n" "$i" "${WK_REGIONS[$code]}"
         ((i++))
     done
     
     echo ""
-    read -rp "选择 [1-${#WK_REGIONS[@]}] (默认1): " choice
+    read -rp "选择 [1-${#WK_REGION_CODES[@]}] (默认1): " choice
     choice=${choice:-1}
     
-    local region_codes=("${!WK_REGIONS[@]}")
-    local selected="${region_codes[$((choice-1))]}"
+    local selected="${WK_REGION_CODES[$((choice-1))]}"
     
     if [ -z "$selected" ]; then
         selected="auto"
@@ -736,6 +765,7 @@ main() {
             sleep 2
             warp-cli --accept-tos connect 2>/dev/null
             sleep 10
+            _restore_iptables_rules
             echo -e "${GREEN}✓ 修复完成${NC}"
             ;;
         --help)
@@ -765,14 +795,13 @@ main() {
                 2) 
                     echo -e "\n${CYAN}选择地区:${NC}"
                     local i=1
-                    for code in "${!WK_REGIONS[@]}"; do
+                    for code in "${WK_REGION_CODES[@]}"; do
                         printf "  ${GREEN}%d.${NC} %s\n" "$i" "${WK_REGIONS[$code]}"
                         ((i++))
                     done
                     echo ""
-                    read -rp "选择 [1-${#WK_REGIONS[@]}]: " region_choice
-                    local regions=("${!WK_REGIONS[@]}")
-                    local target="${regions[$((region_choice-1))]}"
+                    read -rp "选择 [1-${#WK_REGION_CODES[@]}]: " region_choice
+                    local target="${WK_REGION_CODES[$((region_choice-1))]}"
                     wk_smart_region_engine "${target:-auto}"
                     ;;
                 3) run_tests ;;
@@ -783,6 +812,7 @@ main() {
                     sleep 2
                     warp-cli --accept-tos connect 2>/dev/null
                     sleep 10
+                    _restore_iptables_rules
                     echo -e "${GREEN}✓ 修复完成${NC}"
                     ;;
                 5) 

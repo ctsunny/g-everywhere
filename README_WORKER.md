@@ -10,12 +10,12 @@
 
 ### 一键安装
 ```bash
-curl -fsSL https://raw.githubusercontent.com/yourusername/g-everywhere/main/g-everywhere-wk-final.sh | bash
+curl -fsSL https://raw.githubusercontent.com/ctsunny/g-everywhere/main/g-everywhere-wk-final.sh | bash
 ```
 
 ### 或下载后安装
 ```bash
-wget https://raw.githubusercontent.com/yourusername/g-everywhere/main/g-everywhere-wk-final.sh
+wget https://raw.githubusercontent.com/ctsunny/g-everywhere/main/g-everywhere-wk-final.sh
 bash g-everywhere-wk-final.sh --install
 ```
 
@@ -198,8 +198,8 @@ MIT License
 
 ## 📞 支持
 
-- GitHub Issues: [问题反馈](https://github.com/yourusername/g-everywhere/issues)
-- 讨论区: [Discussions](https://github.com/yourusername/g-everywhere/discussions)
+- GitHub Issues: [问题反馈](https://github.com/ctsunny/g-everywhere/issues)
+- 讨论区: [Discussions](https://github.com/ctsunny/g-everywhere/discussions)
 
 ---
 

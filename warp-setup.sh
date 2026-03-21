@@ -309,7 +309,15 @@ init_proxy_map_if_missing() {
   "us": "",
   "sg": "",
   "jp": "",
-  "hk": ""
+  "hk": "",
+  "de": "",
+  "uk": "",
+  "nl": "",
+  "au": "",
+  "kr": "",
+  "ca": "",
+  "in": "",
+  "br": ""
 }
 EOF
   chmod 600 "$PROXY_MAP_FILE"
@@ -379,6 +387,7 @@ init_install_defaults() {
   WS_BASE_PATH="${WS_BASE_PATH:-/ws}"
   SOCKS_PORT="${SOCKS_PORT:-7892}"
   HTTP_PORT="${HTTP_PORT:-7893}"
+  SNI="${SNI:-}"
 }
 
 write_worker_files() {

@@ -12,7 +12,7 @@ CYAN='\033[0;36m'
 NC='\033[0m'
 
 # GitHub 仓库信息
-REPO_OWNER="yourusername"  # 请替换为你的 GitHub 用户名
+REPO_OWNER="ctsunny"
 REPO_NAME="g-everywhere"
 BRANCH="main"
 
