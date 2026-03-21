@@ -372,15 +372,15 @@ WKEOF
     # 创建别名文件
     cat > /etc/profile.d/wk-alias.sh << 'ALIASEOF'
 alias wk='bash /usr/local/bin/wk'
-alias wk=us='bash /usr/local/bin/wk us'
-alias wk=sg='bash /usr/local/bin/wk sg'
-alias wk=jp='bash /usr/local/bin/wk jp'
-alias wk=de='bash /usr/local/bin/wk de'
-alias wk=uk='bash /usr/local/bin/wk uk'
-alias wk=nl='bash /usr/local/bin/wk nl'
-alias wk=au='bash /usr/local/bin/wk au'
-alias wk=kr='bash /usr/local/bin/wk kr'
-alias wk=hk='bash /usr/local/bin/wk hk'
+alias 'wk=us'='bash /usr/local/bin/wk us'
+alias 'wk=sg'='bash /usr/local/bin/wk sg'
+alias 'wk=jp'='bash /usr/local/bin/wk jp'
+alias 'wk=de'='bash /usr/local/bin/wk de'
+alias 'wk=uk'='bash /usr/local/bin/wk uk'
+alias 'wk=nl'='bash /usr/local/bin/wk nl'
+alias 'wk=au'='bash /usr/local/bin/wk au'
+alias 'wk=kr'='bash /usr/local/bin/wk kr'
+alias 'wk=hk'='bash /usr/local/bin/wk hk'
 ALIASEOF
     
     source /etc/profile.d/wk-alias.sh 2>/dev/null
