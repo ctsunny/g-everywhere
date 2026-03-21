@@ -8,7 +8,11 @@ CYAN='\033[0;36m'; BLUE='\033[0;34m'; NC='\033[0m'; BOLD='\033[1m'
 WARP_DIR="/etc/warp"
 REDSOCKS_CONF="/etc/redsocks-warp.conf"
 MODE_FILE="${WARP_DIR}/mode"
+PROXY_MODE_FILE="${WARP_DIR}/proxy_mode"
 WK_REGION_FILE="${WARP_DIR}/wk_region"
+ECH_CONF="${WARP_DIR}/ech.conf"
+ECH_BIN="/usr/bin/ech-workers"
+ECH_LOCAL_PORT="30001"
 
 # Google IP段
 GOOGLE_IPS=(
@@ -61,8 +65,18 @@ _routing_stop() {
     iptables -t nat -X WARP_GOOGLE 2>/dev/null || true
 }
 
+_get_proxy_mode() {
+    [ -f "$PROXY_MODE_FILE" ] && cat "$PROXY_MODE_FILE" || echo "warp"
+}
+
 _get_exit_ip() {
-    curl -x socks5://127.0.0.1:40000 -s --max-time 8 ip.sb 2>/dev/null
+    local mode
+    mode=$(_get_proxy_mode)
+    if [ "$mode" = "ech" ]; then
+        curl -x socks5://127.0.0.1:${ECH_LOCAL_PORT} -s --max-time 10 ip.sb 2>/dev/null
+    else
+        curl -x socks5://127.0.0.1:40000 -s --max-time 8 ip.sb 2>/dev/null
+    fi
 }
 
 # ============================================
@@ -222,14 +236,23 @@ _wk_smart_connect() {
 # ============================================
 cmd_start() {
     echo -e "${CYAN}启动中...${NC}"
-    systemctl start warp-svc 2>/dev/null
-    sleep 2
-    warp-cli --accept-tos connect 2>/dev/null
-    sleep 6
-    systemctl start redsocks-warp 2>/dev/null
-    sleep 1
+    local mode
+    mode=$(_get_proxy_mode)
+    if [ "$mode" = "ech" ]; then
+        systemctl start ech-workers 2>/dev/null
+        sleep 2
+        systemctl start redsocks-warp 2>/dev/null
+        sleep 1
+    else
+        systemctl start warp-svc 2>/dev/null
+        sleep 2
+        warp-cli --accept-tos connect 2>/dev/null
+        sleep 6
+        systemctl start redsocks-warp 2>/dev/null
+        sleep 1
+    fi
     _routing_start
-    
+
     local code
     code=$(curl -s --max-time 8 -o /dev/null -w "%{http_code}" https://www.google.com)
     if [ "$code" = "200" ] || [ "$code" = "301" ]; then
@@ -241,7 +264,13 @@ cmd_start() {
 
 cmd_stop() {
     _routing_stop
-    warp-cli --accept-tos disconnect 2>/dev/null
+    local mode
+    mode=$(_get_proxy_mode)
+    if [ "$mode" = "ech" ]; then
+        systemctl stop ech-workers 2>/dev/null
+    else
+        warp-cli --accept-tos disconnect 2>/dev/null
+    fi
     systemctl stop redsocks-warp 2>/dev/null
     echo -e "${GREEN}✓ 已停止${NC}"
 }
@@ -253,48 +282,74 @@ cmd_restart() {
 }
 
 cmd_status() {
-    echo -e "\n${CYAN}━━ warp-cli 状态 ━━${NC}"
-    warp-cli status 2>/dev/null | sed 's/^/  /'
-    
+    local mode
+    mode=$(_get_proxy_mode)
+
+    echo -e "\n${CYAN}━━ 代理模式 ━━${NC}"
+    echo -e "  模式: ${BLUE}${mode}${NC}"
+
+    if [ "$mode" = "ech" ]; then
+        echo -e "\n${CYAN}━━ ECH Workers 状态 ━━${NC}"
+        if systemctl is-active ech-workers &>/dev/null; then
+            echo -e "  ${GREEN}✓ ech-workers 运行中 (SOCKS5 端口: ${ECH_LOCAL_PORT})${NC}"
+        else
+            echo -e "  ${RED}✗ ech-workers 未运行${NC}"
+        fi
+        if [ -f "$ECH_CONF" ]; then
+            local srv_domain srv_port best_ip
+            srv_domain=$(grep '^SERVER_DOMAIN=' "$ECH_CONF" | cut -d'"' -f2)
+            srv_port=$(grep '^SERVER_PORT=' "$ECH_CONF" | cut -d'"' -f2)
+            best_ip=$(grep '^BEST_IP=' "$ECH_CONF" | cut -d'"' -f2)
+            echo -e "  Worker 域名: ${CYAN}${srv_domain:-未配置}${NC}"
+            echo -e "  回源端口:   ${CYAN}${srv_port:-443}${NC}"
+            echo -e "  优选IP:     ${CYAN}${best_ip:-自动}${NC}"
+        fi
+    else
+        echo -e "\n${CYAN}━━ warp-cli 状态 ━━${NC}"
+        warp-cli status 2>/dev/null | sed 's/^/  /'
+    fi
+
     echo -e "\n${CYAN}━━ redsocks 状态 ━━${NC}"
     if systemctl is-active redsocks-warp &>/dev/null; then
         echo -e "  ${GREEN}✓ redsocks 运行中 (port 12345)${NC}"
     else
         echo -e "  ${RED}✗ redsocks 未运行${NC}"
     fi
-    
+
     echo -e "\n${CYAN}━━ wk=地区设置 ━━${NC}"
     if [ -f "$WK_REGION_FILE" ]; then
-        local region=$(cat "$WK_REGION_FILE")
+        local region
+        region=$(cat "$WK_REGION_FILE")
         echo -e "  当前设置: ${GREEN}${WK_MAP[$region]}${NC}"
     else
         echo -e "  未设置 (默认: auto)${NC}"
     fi
-    
+
     echo -e "\n${CYAN}━━ 出口信息 ━━${NC}"
     if [ -f "${WARP_DIR}/exit_info" ]; then
         local ip country
         read -r ip country < "${WARP_DIR}/exit_info"
         echo -e "  出口IP: ${GREEN}$ip ($country)${NC}"
     fi
-    
-    local live_ip=$(_get_exit_ip)
+
+    local live_ip
+    live_ip=$(_get_exit_ip)
     if [ -n "$live_ip" ]; then
         echo -e "  实时出口: ${GREEN}$live_ip${NC}"
     else
         echo -e "  实时出口: ${YELLOW}获取中...${NC}"
     fi
-    
+
     echo -e "\n${CYAN}━━ 访问测试 ━━${NC}"
     local g gem
     g=$(curl -s --max-time 8 -o /dev/null -w "%{http_code}" https://www.google.com)
     gem=$(curl -s --max-time 8 -o /dev/null -w "%{http_code}" \
         -H "User-Agent: Mozilla/5.0" https://gemini.google.com)
-    
+
     [ "$g" = "200" ] || [ "$g" = "301" ] \
         && echo -e "  ${GREEN}✓ Google  HTTP $g${NC}" \
         || echo -e "  ${RED}✗ Google  HTTP $g${NC}"
-    
+
     [ "$gem" = "200" ] || [ "$gem" = "301" ] \
         && echo -e "  ${GREEN}✓ Gemini  HTTP $gem${NC}" \
         || echo -e "  ${YELLOW}△ Gemini  HTTP $gem${NC}"
@@ -303,65 +358,86 @@ cmd_status() {
 
 cmd_test() {
     echo -e "\n${CYAN}━━ 完整诊断 ━━${NC}\n"
-    
-    echo -e "${YELLOW}[1] warp-cli 连接${NC}"
-    warp-cli status 2>/dev/null | grep -qi "connected" \
-        && echo -e "  ${GREEN}✓ 已连接${NC}" \
-        || echo -e "  ${RED}✗ 未连接${NC}"
-    
+    local mode
+    mode=$(_get_proxy_mode)
+    echo -e "代理模式: ${BLUE}${mode}${NC}\n"
+
+    if [ "$mode" = "ech" ]; then
+        echo -e "${YELLOW}[1] ECH Workers 服务${NC}"
+        systemctl is-active ech-workers &>/dev/null \
+            && echo -e "  ${GREEN}✓ 运行中${NC}" \
+            || echo -e "  ${RED}✗ 未运行${NC}"
+    else
+        echo -e "${YELLOW}[1] warp-cli 连接${NC}"
+        warp-cli status 2>/dev/null | grep -qi "connected" \
+            && echo -e "  ${GREEN}✓ 已连接${NC}" \
+            || echo -e "  ${RED}✗ 未连接${NC}"
+    fi
+
     echo -e "\n${YELLOW}[2] redsocks 服务${NC}"
     systemctl is-active redsocks-warp &>/dev/null \
         && echo -e "  ${GREEN}✓ 运行中${NC}" \
         || echo -e "  ${RED}✗ 未运行${NC}"
-    
+
     echo -e "\n${YELLOW}[3] iptables 规则${NC}"
     local cnt
     cnt=$(iptables -t nat -L WARP_GOOGLE -n 2>/dev/null | grep -c REDIRECT || echo 0)
     [ "$cnt" -gt 0 ] \
         && echo -e "  ${GREEN}✓ $cnt 条规则${NC}" \
         || echo -e "  ${RED}✗ 无规则${NC}"
-    
+
     echo -e "\n${YELLOW}[4] SOCKS5 测试${NC}"
     local socks_ip
     socks_ip=$(_get_exit_ip)
     [ -n "$socks_ip" ] \
         && echo -e "  ${GREEN}✓ 可用 ($socks_ip)${NC}" \
         || echo -e "  ${RED}✗ 不可用${NC}"
-    
+
     echo -e "\n${YELLOW}[5] 网站访问${NC}"
     local sites=(
         "Google:https://www.google.com"
-        "YouTube:https://www.youtube.com" 
+        "YouTube:https://www.youtube.com"
         "Gemini:https://gemini.google.com"
     )
-    
+
     for site in "${sites[@]}"; do
         local name="${site%%:*}" url="${site#*:}"
         local code
         code=$(curl -s --max-time 10 -o /dev/null -w "%{http_code}" \
             -H "User-Agent: Mozilla/5.0" "$url" 2>/dev/null || echo "000")
-        
+
         if [ "$code" = "200" ] || [ "$code" = "301" ]; then
             printf "  ${GREEN}✓${NC} %-10s HTTP %s\n" "$name" "$code"
         else
             printf "  ${RED}✗${NC} %-10s HTTP %s\n" "$name" "$code"
         fi
     done
-    
+
     echo -e "\n${YELLOW}[6] 分流验证${NC}"
     local direct_ip warp_ip
     direct_ip=$(curl -4 -s --max-time 5 ip.sb 2>/dev/null)
     warp_ip=$(_get_exit_ip)
-    
+
     echo -e "  直连: ${GREEN}$direct_ip${NC}"
-    echo -e "  WARP: ${GREEN}$warp_ip${NC}"
-    
+    echo -e "  代理: ${GREEN}$warp_ip${NC}"
+
     if [ -n "$direct_ip" ] && [ -n "$warp_ip" ] && [ "$direct_ip" != "$warp_ip" ]; then
         echo -e "  ${GREEN}✓ 分流正常${NC}"
     else
         echo -e "  ${YELLOW}△ 分流检查${NC}"
     fi
     echo ""
+}
+
+# ECH Workers 配置向导入口
+cmd_ech_config() {
+    [[ $EUID -ne 0 ]] && { echo -e "${RED}请用 root 用户运行${NC}"; exit 1; }
+    if [ -f "/usr/local/bin/g-everywhere-wk" ]; then
+        /usr/local/bin/g-everywhere-wk --ech-config
+    else
+        echo -e "${RED}主脚本未找到，请先安装${NC}"
+        exit 1
+    fi
 }
 
 cmd_ip() {
@@ -447,7 +523,7 @@ main() {
         _wk_switch "$region"
         return
     fi
-    
+
     # 传统命令
     case "${1:-help}" in
         start)      cmd_start ;;
@@ -458,8 +534,9 @@ main() {
         ip)         cmd_ip ;;
         fix)        cmd_fix ;;
         region)     cmd_region ;;
+        ech-config) cmd_ech_config ;;
         uninstall)  cmd_uninstall ;;
-        
+
         # wk快捷命令
         wk=*)       _wk_switch "${1#wk=}" ;;
         wk-auto)    _wk_switch "auto" ;;
@@ -475,21 +552,26 @@ main() {
         wk-ca)      _wk_switch "ca" ;;
         wk-in)      _wk_switch "in" ;;
         wk-br)      _wk_switch "br" ;;
-        
+
         # 帮助
         help|*)
-            echo -e "${CYAN}ge-wk v5.1 - 集成wk=快速切换${NC}\n"
+            local mode
+            mode=$(_get_proxy_mode)
+            echo -e "${CYAN}ge-wk v5.2 - 集成wk=快速切换${NC}"
+            echo -e "${BLUE}代理模式: ${BOLD}${mode}${NC}\n"
             echo -e "${GREEN}传统命令:${NC}"
             echo "  start stop restart"
             echo "  status test ip fix"
             echo "  region uninstall"
-            echo -e "\n${YELLOW}wk=快速切换:${NC}"
+            echo -e "  ${YELLOW}ech-config${NC}  配置 ECH Workers 域名/回源端口"
+            echo -e "\n${YELLOW}wk=快速切换出口地区:${NC}"
             echo "  wk=us      切换到美国"
             echo "  wk=sg      切换到新加坡"
             echo "  wk=jp      切换到日本"
+            echo "  wk=hk      切换到香港"
             echo "  wk=auto    自动模式"
             echo -e "\n${CYAN}或使用:${NC}"
-            echo "  wk-us wk-sg wk-jp 等"
+            echo "  wk-us wk-sg wk-jp wk-hk 等"
             ;;
     esac
 }
