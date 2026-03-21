@@ -7,7 +7,7 @@
 ## 📦 安装
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/ctsunny/g-everywhere/main/install.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/ctsunny/g-everywhere/master/install.sh)
 ```
 
 > 需要 root 权限运行。安装完成后建议重新登录，使 `wk=` 命令别名生效，或手动执行：
@@ -21,7 +21,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/ctsunny/g-everywhere/main/in
 ## 🔄 升级
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/ctsunny/g-everywhere/main/install.sh) --update
+bash <(curl -fsSL https://raw.githubusercontent.com/ctsunny/g-everywhere/master/install.sh) --update
 ```
 
 ---
@@ -29,7 +29,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/ctsunny/g-everywhere/main/in
 ## 🗑️ 卸载
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/ctsunny/g-everywhere/main/install.sh) --uninstall
+bash <(curl -fsSL https://raw.githubusercontent.com/ctsunny/g-everywhere/master/install.sh) --uninstall
 ```
 
 ---

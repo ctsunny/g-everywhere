@@ -10,12 +10,12 @@
 
 ### 一键安装
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ctsunny/g-everywhere/main/g-everywhere-wk-final.sh | bash
+curl -fsSL https://raw.githubusercontent.com/ctsunny/g-everywhere/master/g-everywhere-wk-final.sh | bash
 ```
 
 ### 或下载后安装
 ```bash
-wget https://raw.githubusercontent.com/ctsunny/g-everywhere/main/g-everywhere-wk-final.sh
+wget https://raw.githubusercontent.com/ctsunny/g-everywhere/master/g-everywhere-wk-final.sh
 bash g-everywhere-wk-final.sh --install
 ```
 

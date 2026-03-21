@@ -14,7 +14,7 @@ NC='\033[0m'
 # GitHub 仓库信息
 REPO_OWNER="ctsunny"
 REPO_NAME="g-everywhere"
-BRANCH="main"
+BRANCH="master"
 
 # 下载 URL
 BASE_URL="https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/${BRANCH}"
